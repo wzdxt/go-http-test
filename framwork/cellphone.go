@@ -2,26 +2,68 @@ package framework
 
 import (
 	"github.com/wzdxt/go-http-test/command"
+	"strings"
+	"fmt"
+	"reflect"
 )
 
 //receiver
 type App struct {
-	platform int
-	version  string
-	os       string
-	model    string
-	channel  string
+	platform     int
+	version      string
+	os           string
+	model        string
+	channel      string
 
-	lastResponse Response
-	nextUrl      string
+	host         string
+	LastResponse Response
+	nextUri      string
+	normalParams ResponseResult
+	userParams   ResponseResult
 }
 
 type Response struct {
-	lastResponse Response
+	lastResponse *Response
 	result       ResponseResult
 }
 
-type ResponseResult map[string]interface{}
+type Params map[string]Anything
+type ResponseResult map[string]Anything
+
+func (this ResponseResult) Get(key string) Anything {
+	var rr Anything = this
+	keys := strings.Split(key, ".")
+	for _, k := range keys {
+		switch reflect.TypeOf(rr) {
+		case reflect.TypeOf(ResponseResult{}):
+			rr = rr.(ResponseResult)[k]
+		default:
+			panic(fmt.Sprintf("not a ResponseResult instance: [%T]%v", rr, rr))
+		}
+	}
+	return rr
+}
+
+func (this *ResponseResult) Set(key string, value string) {
+	var rr Anything = this
+	keys := strings.Split(key, ".")
+	for i, k := range keys {
+		switch reflect.TypeOf(rr) {
+		case reflect.TypeOf(ResponseResult{}):
+			if i == len(keys) - 1 {
+				rr.(ResponseResult)[k] = &value
+			} else {
+				if rr.(ResponseResult)[k] == nil {
+					rr.(ResponseResult)[k] = ResponseResult{}
+				}
+				rr = rr.(ResponseResult)[k]
+			}
+		default:
+			panic(fmt.Sprintf("not a ResponseResult instance: [%T]%v", rr, rr))
+		}
+	}
+
+}
 
 //invoker
 type Customer struct {

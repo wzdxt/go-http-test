@@ -4,6 +4,8 @@ import (
 	"fmt"
 )
 
+type Anything interface{}
+
 //command
 type RequestCommand struct {
 	app *App
@@ -12,16 +14,25 @@ type RequestCommand struct {
 func (this RequestCommand) Execute() {
 	fmt.Println("execute request command on", *this.app)
 	//request
-	this.app.nextUrl = ""
+	this.app.nextUri = ""
 	//response
-	this.app.lastResponse = Response{
-		lastResponse: this.app.lastResponse,
+	this.app.LastResponse = Response{
+		lastResponse: &this.app.LastResponse,
 		result:       ResponseResult{},
 	}
 }
 
 //command
-type Params map[string]interface{}
+type UriCommand struct {
+	app *App
+	uri string
+}
+
+func (this UriCommand) Execute() {
+	this.app.nextUri += "/" + this.uri
+}
+
+//command
 type SetParamsCommand struct {
 	app    *App
 	params Params
