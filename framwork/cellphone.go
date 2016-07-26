@@ -5,6 +5,7 @@ import (
 	"strings"
 	"fmt"
 	"reflect"
+	"strconv"
 )
 
 //receiver
@@ -15,11 +16,75 @@ type App struct {
 	model        string
 	channel      string
 
-	host         string
+	Host         string
+	Cookies      Params
 	LastResponse Response
-	nextUri      string
-	normalParams ResponseResult
-	userParams   ResponseResult
+	Params       Params
+	SavedParams  Params
+	OnlyKeys     []string
+	ExceptKeys   []string
+}
+
+func (this *App)SetResponse(res ResponseResult) {
+	this.LastResponse = Response{
+		lastResponse:&this.LastResponse,
+		result:res,
+	}
+}
+
+func (this *App)SetParams(params Params) {
+	for k, v := range params {
+		this.Params[k] = v
+	}
+}
+
+func (this App)Save(keys []string) {
+	for _, key := range keys {
+		this.SavedParams[key] = this.Params[key]
+	}
+}
+
+func (this App)Load(keys []string) {
+	for _, key := range keys {
+		this.Params[key] = this.SavedParams[key]
+	}
+}
+
+func (this App)SaveAs(keyMap map[string]string) {
+	for from, to := range keyMap {
+		this.SavedParams[to] = this.Params[from]
+	}
+}
+
+func (this App)LoadAs(keyMap map[string]string) {
+	for from, to := range keyMap {
+		this.Params[to] = this.SavedParams[from]
+	}
+}
+
+func (this App)Only(keys []string) {
+	this.OnlyKeys = keys
+}
+
+func (this App)Except(keys []string) {
+	this.ExceptKeys = keys
+}
+
+func (this App)GetRequestParams() Params {
+	switch  {
+	case len(this.OnlyKeys) > 0:
+		ret := make(Params, len(this.OnlyKeys))
+		for _, key := range this.OnlyKeys {
+			ret[key] = this.Params[key]
+		}
+		return ret
+	default:
+		ret := this.Params //todo: 获取uri对应参数
+		for _, key := range this.ExceptKeys {
+			delete(ret, key)
+		}
+		return ret
+	}
 }
 
 type Response struct {
@@ -27,36 +92,45 @@ type Response struct {
 	result       ResponseResult
 }
 
+type Anything interface{}
 type Params map[string]Anything
-type ResponseResult map[string]Anything
+type ResponseResult struct {
+	Params
+}
 
-func (this ResponseResult) Get(key string) Anything {
+func (this Params) Get(key string) Anything {
 	var rr Anything = this
 	keys := strings.Split(key, ".")
 	for _, k := range keys {
-		switch reflect.TypeOf(rr) {
-		case reflect.TypeOf(ResponseResult{}):
-			rr = rr.(ResponseResult)[k]
-		default:
-			panic(fmt.Sprintf("not a ResponseResult instance: [%T]%v", rr, rr))
+		if i, err := strconv.Atoi(k); err == nil {
+			rr = rr[i]
+		} else {
+			switch reflect.TypeOf(rr) {
+			case reflect.TypeOf(ResponseResult{}), reflect.TypeOf(Params{}):
+				rr = rr.(Params)[k]
+			default:
+				panic(fmt.Sprintf("not a ResponseResult instance: [%T]%v", rr, rr))
+			}
 		}
 	}
 	return rr
 }
 
-func (this *ResponseResult) Set(key string, value string) {
+func (this *Params) Set(key string, value string) {
 	var rr Anything = this
 	keys := strings.Split(key, ".")
 	for i, k := range keys {
 		switch reflect.TypeOf(rr) {
-		case reflect.TypeOf(ResponseResult{}):
+		case reflect.TypeOf(new(ResponseResult)), reflect.TypeOf(new(Params)):
 			if i == len(keys) - 1 {
-				rr.(ResponseResult)[k] = &value
+				(*rr.(*Params))[k] = value
 			} else {
-				if rr.(ResponseResult)[k] == nil {
-					rr.(ResponseResult)[k] = ResponseResult{}
+				if (*(rr.(*Params)))[k] == nil {
+					m := make(Params)
+					(*rr.(*Params))[k] = m
 				}
-				rr = rr.(ResponseResult)[k]
+				m := (*rr.(*Params))[k].(Params)
+				rr = &m
 			}
 		default:
 			panic(fmt.Sprintf("not a ResponseResult instance: [%T]%v", rr, rr))
