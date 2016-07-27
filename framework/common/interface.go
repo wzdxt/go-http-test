@@ -1,4 +1,4 @@
-package command
+package common
 
 type Receiver interface {
 }
@@ -14,4 +14,8 @@ type Invoker interface {
 
 type Client interface {
 	Run()
+}
+
+type Validator interface {
+	Validate(Response)
 }
